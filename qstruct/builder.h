@@ -17,18 +17,14 @@ struct qstruct_builder {
   uint32_t body_count;
 };
 
-static QSTRUCT_INLINE struct qstruct_builder *qstruct_builder_new(uint64_t magic_id, uint32_t body_size, uint32_t body_count) {
-  struct qstruct_builder *builder;
+static QSTRUCT_INLINE int qstruct_builder_emplace(struct qstruct_builder *builder, uint64_t magic_id, uint32_t body_size, uint32_t body_count) {
   uint64_t content_size64;
   size_t content_size;
 
   content_size64 = QSTRUCT_ALIGN_UP(body_size, QSTRUCT_BODY_SIZE_TO_ALIGNMENT(body_size)) * body_count;
-  if (content_size64 > SIZE_MAX/2) return NULL;
+  if (content_size64 > SIZE_MAX/2) return 1;
 
   content_size = (size_t) content_size64;
-
-  builder = malloc(sizeof(struct qstruct_builder));
-  if (builder == NULL) return NULL;
 
   builder->body_size = body_size;
   builder->body_count = body_count;
@@ -38,19 +34,36 @@ static QSTRUCT_INLINE struct qstruct_builder *qstruct_builder_new(uint64_t magic
   builder->buf = calloc(builder->buf_size, 1);
 
   if (builder->buf == NULL) {
-    free(builder);
-    return NULL;
+    return 1;
   }
 
   QSTRUCT_STORE_8BYTE_LE(&magic_id, builder->buf);
   QSTRUCT_STORE_4BYTE_LE(&body_size, builder->buf + 8);
   QSTRUCT_STORE_4BYTE_LE(&body_count, builder->buf + 12);
 
+  return 0;
+}
+
+static QSTRUCT_INLINE struct qstruct_builder *qstruct_builder_new(uint64_t magic_id, uint32_t body_size, uint32_t body_count) {
+  struct qstruct_builder *builder;
+
+  builder = malloc(sizeof(struct qstruct_builder));
+  if (builder == NULL) return NULL;
+
+  if (qstruct_builder_emplace(builder, magic_id, body_size, body_count) != 0) {
+    free(builder);
+    return NULL;
+  }
+
   return builder;
 }
 
-static QSTRUCT_INLINE void qstruct_builder_free(struct qstruct_builder *builder) {
+static QSTRUCT_INLINE void qstruct_builder_free_buf(struct qstruct_builder *builder) {
   if (builder->buf) free(builder->buf);
+}
+
+static QSTRUCT_INLINE void qstruct_builder_free(struct qstruct_builder *builder) {
+  qstruct_builder_free_buf(builder);
   free(builder);
 }
 
