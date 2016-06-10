@@ -84,6 +84,24 @@ static QSTRUCT_INLINE char *qstruct_builder_steal_buf(struct qstruct_builder *bu
   return buf;
 }
 
+static QSTRUCT_INLINE int qstruct_builder_give_buf(struct qstruct_builder *builder, char *buf, size_t buf_size) {
+
+    if (!buf || buf_size < 16) {
+        return -1;
+    }
+
+    qstruct_builder_free_buf(builder);
+
+    builder->buf = buf;
+    builder->buf_size = buf_size;
+
+    QSTRUCT_LOAD_4BYTE_LE(builder->buf + 8, &builder->body_size);
+    QSTRUCT_LOAD_4BYTE_LE(builder->buf + 12, &builder->body_count);
+    builder->msg_size = buf_size;
+
+    return 0;
+}
+
 static QSTRUCT_INLINE int qstruct_builder_expand_msg(struct qstruct_builder *builder, size_t new_buf_size) {
   char *new_buf;
 
